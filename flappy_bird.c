@@ -11,8 +11,9 @@
 // include CC65 NES Header (PPU)
 #include <nes.h>
 
-// link the pattern table into CHR ROM
-//#link "chr_generic.s"
+// CHR Data
+//#resource "tileset.chr"       // Character set (CHR) data
+//#link "tileset.s"
 
 // BCD arithmetic support
 #include "bcd.h"
