@@ -66,6 +66,9 @@
 
 /*
 
+$ 0F: Black
+$ 30: White
+
 $ x0: Gray
 $ x1: Azure
 $ x2: Blue
@@ -91,10 +94,10 @@ const char PALETTE[32] = {
   0x19,0x2C,0x39,0x00,	            // background palette 2     ~bushes
   0x2C,0x3D,0x30,0x00,              // background palette 3     ~buildings and clouds
 
-  0x0f,0x28,0x30,0x00,	            // sprite palette 0         ~bird body
-  0x0f,0x28,0x16,0x00,	            // sprite palette 1         ~bird mouth
-  0x0f,0x1B,0x2A,0x00,	            // sprite palette 2         ~pipe shadow
-  0x0f,0x2A,0x3A	            // sprite palette 3         ~pipe light
+  0x0F,0x28,0x30,0x00,	            // sprite palette 0         ~bird body
+  0x0F,0x28,0x16,0x00,	            // sprite palette 1         ~bird mouth
+  0x0F,0x1B,0x2A,0x00,	            // sprite palette 2         ~pipe shadow
+  0x0F,0x2A,0x3A	            // sprite palette 3         ~pipe light
 };
 
 
