@@ -64,20 +64,37 @@
 //                     PALETTE SETUP                      //
 //--------------------------------------------------------//
 
+/*
+
+$ x0: Gray
+$ x1: Azure
+$ x2: Blue
+$ x3: Violet
+$ x4: Magenta
+$ x5: Rose
+$ x6: Red or maroon
+$ x7: Orange
+$ x8: Yellow or olive
+$ x9: Chartreuse
+$ xA: Green
+$ xB: Spring
+$ xC: Cyan
+
+*/
+
 
 /*{pal:"nes",layout:"nes"}*/
 const char PALETTE[32] = { 
-  0x21,			            // screen color
+  0x21,			            // screen color             ~sky
+  0x19,0x29,0x39,0x00,	            // background palette 0     ~grass  
+  0x19,0x27,0x37,0x00,	            // background palette 1     ~ground
+  0x19,0x2C,0x39,0x00,	            // background palette 2     ~bushes
+  0x2C,0x3D,0x30,0x00,              // background palette 3     ~buildings and clouds
 
-  0x19,0x29,0x39,0x00,	            // background palette 0
-  0x19,0x27,0x37,0x00,	            // background palette 1
-  0x19,0x2C,0x39,0x00,	            // background palette 2
-  0x2C,0x3D,0x30,0x00,              // background palette 3
-
-  0x16,0x35,0x24,0x00,	            // sprite palette 0
-  0x00,0x37,0x25,0x00,	            // sprite palette 1
-  0x0D,0x2D,0x3A,0x00,	            // sprite palette 2
-  0x0D,0x27,0x2A	            // sprite palette 3
+  0x0f,0x28,0x30,0x00,	            // sprite palette 0         ~bird body
+  0x0f,0x28,0x16,0x00,	            // sprite palette 1         ~bird mouth
+  0x0f,0x1B,0x2A,0x00,	            // sprite palette 2         ~pipe shadow
+  0x0f,0x2A,0x3A	            // sprite palette 3         ~pipe light
 };
 
 
