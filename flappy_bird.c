@@ -108,7 +108,7 @@ const char PALETTE[32] = {
 
 
 
-
+int this_is_a_change = 1;
 
 
 
