@@ -132,10 +132,10 @@ void setup_graphics();
 
 // setup PPU and tables
 void setup_graphics() {
-  // clear sprites
-  oam_clear();
-  // set palette colors
-  pal_all(PALETTE);
+  oam_clear();             // clear OAM buffer, all the sprites are hidden
+  pal_all(PALETTE);        // set palette colors
+  bank_bg(0);              // select chr bank 0 for background
+  bank_spr(1);             // select chr bank 1 for sprites
 }
 
 
@@ -146,7 +146,7 @@ void setup_graphics() {
 void main(void)
 {
   setup_graphics();
-  // draw message  
+  // draw background  
   vram_adr(NAMETABLE_A);
   vram_write(nametable_game, 1024);
   // enable rendering
