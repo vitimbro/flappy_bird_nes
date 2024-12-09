@@ -59,6 +59,28 @@
 
 
 
+//-------------------- METASPRITES -----------------------//
+
+// Define a 2x2 Metasprite
+#define DEF_METASPRITE_2x2(name,code,pal) \
+    const unsigned char name[]={          \
+        0, 0, (code)+0, pal,              \
+        8, 0, (code)+1, pal,              \
+        0, 8, (code)+2, pal,              \
+        8, 8, (code)+3, pal,              \
+        128                               \
+    };
+
+// Define a 2x2 Metasprite Horizontally-Flipped                        
+#define DEF_METASPRITE_2x2_H_FLIP(name,code,pal) \
+    const unsigned char name[]={                 \
+        8, 0, (code)+0, (pal)|OAM_FLIP_H,       \
+        0, 0, (code)+1, (pal)|OAM_FLIP_H,       \
+        8, 8, (code)+2, (pal)|OAM_FLIP_H,       \
+        0, 8, (code)+3, (pal)|OAM_FLIP_H,       \
+        128                                     \
+    };
+
 
 //--------------------------------------------------------//
 //                     PALETTE SETUP                      //
@@ -108,7 +130,7 @@ const char PALETTE[32] = {
 
 
 
-int this_is_a_change = 1;
+
 
 
 
