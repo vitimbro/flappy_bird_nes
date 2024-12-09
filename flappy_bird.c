@@ -61,25 +61,16 @@
 
 //-------------------- METASPRITES -----------------------//
 
-// Define a 2x2 Metasprite
+// Define a 2x2 Metasprite for Flappy Bird
 #define DEF_METASPRITE_2x2(name,code,pal) \
     const unsigned char name[]={          \
         0, 0, (code)+0, pal,              \
         8, 0, (code)+1, pal,              \
-        0, 8, (code)+2, pal,              \
-        8, 8, (code)+3, pal,              \
+        0, 8, (code)+16, pal,             \
+        8, 8, (code)+17, pal+1,           \
         128                               \
     };
 
-// Define a 2x2 Metasprite Horizontally-Flipped                        
-#define DEF_METASPRITE_2x2_H_FLIP(name,code,pal) \
-    const unsigned char name[]={                 \
-        8, 0, (code)+0, (pal)|OAM_FLIP_H,       \
-        0, 0, (code)+1, (pal)|OAM_FLIP_H,       \
-        8, 8, (code)+2, (pal)|OAM_FLIP_H,       \
-        0, 8, (code)+3, (pal)|OAM_FLIP_H,       \
-        128                                     \
-    };
 
 
 //--------------------------------------------------------//
@@ -121,6 +112,15 @@ const char PALETTE[32] = {
   0x0F,0x1B,0x2A,0x00,	            // sprite palette 2         ~pipe shadow
   0x0F,0x2A,0x3A	            // sprite palette 3         ~pipe light
 };
+
+
+//--------------------------------------------------------//
+//                      METASPRITES                       //
+//--------------------------------------------------------//
+
+DEF_METASPRITE_2x2(bird, 0x111, 0); // define bird metasprite
+
+
 
 
 
@@ -167,6 +167,8 @@ void setup_graphics() {
 
 void main(void)
 {
+  char oam_id = 0; // variable to draw sprites
+  
   setup_graphics();
   // draw background  
   vram_adr(NAMETABLE_A);
@@ -175,5 +177,9 @@ void main(void)
   ppu_on_all();
   // infinite loop
   while(1) {
+    
+    oam_id = oam_meta_spr(50, 50, oam_id, bird); // draw flappy bird metasprite
+    
+    
   }
 }
