@@ -58,7 +58,6 @@
 
 
 
-
 //-------------------- METASPRITES -----------------------//
 
 // Define a 2x2 Metasprite for Flappy Bird
@@ -129,7 +128,8 @@ DEF_METASPRITE_2x2(bird, 0x111, 0); // define bird metasprite
 //--------------------------------------------------------//
 
 
-
+int scroll_x = 0; // x scroll position
+int scroll_dx = 1; // x scroll direction
 
 
 
@@ -143,7 +143,7 @@ DEF_METASPRITE_2x2(bird, 0x111, 0); // define bird metasprite
 
 
 void setup_graphics();
-
+void scroll_horizontal();
 
 
 
@@ -160,6 +160,14 @@ void setup_graphics() {
   bank_spr(1);             // select chr bank 1 for sprites
 }
 
+void scroll_horizontal() {
+  // set scroll register
+  // waits for NMI, which means no frame-skip?
+  split(scroll_x, 0);
+  // update scroll_x variable
+  scroll_x += scroll_dx;
+
+}
 
 //--------------------------------------------------------//
 //                    MAIN GAME LOOP                      //
@@ -173,13 +181,25 @@ void main(void)
   // draw background  
   vram_adr(NAMETABLE_A);
   vram_write(nametable_game, 1024);
+  
+  vram_adr(NAMETABLE_B);
+  vram_write(nametable_game, 1024);
+  
+  vram_adr(NTADR_A(1,1));
+  vram_write("SCORE", 5);
+  vram_adr(NTADR_A(7,1));
+  vram_write("12345", 5);
+
+  
   // enable rendering
   ppu_on_all();
+  
   // infinite loop
   while(1) {
-    
+    oam_id = oam_spr(1, 18, 0x11E, OAM_BEHIND, oam_id); // sprite zero for splitting screen
     oam_id = oam_meta_spr(50, 50, oam_id, bird); // draw flappy bird metasprite
     
-    
+    scroll_horizontal();
   }
+  
 }
