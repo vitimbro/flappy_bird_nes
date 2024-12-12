@@ -184,11 +184,6 @@ void main(void)
   
   vram_adr(NAMETABLE_B);
   vram_write(nametable_game, 1024);
-  
-  vram_adr(NTADR_A(1,1));
-  vram_write("SCORE", 5);
-  vram_adr(NTADR_A(7,1));
-  vram_write("12345", 5);
 
   
   // enable rendering
