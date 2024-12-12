@@ -196,7 +196,7 @@ void main(void)
   
   // infinite loop
   while(1) {
-    oam_id = oam_spr(1, 18, 0x11E, OAM_BEHIND, oam_id); // sprite zero for splitting screen
+    oam_id = oam_spr(20, 18, 0x11E, OAM_BEHIND, oam_id); // sprite zero for splitting screen
     oam_id = oam_meta_spr(50, 50, oam_id, bird); // draw flappy bird metasprite
     
     scroll_horizontal();
