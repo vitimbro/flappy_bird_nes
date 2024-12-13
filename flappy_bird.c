@@ -67,6 +67,8 @@
 
 #define JUMP_SPEED -120 
 
+#define PIPE_INIT_Y 21
+
 
 //-------------------- METASPRITES -----------------------//
 
@@ -77,6 +79,15 @@
         8, 0, (code)+1, pal,              \
         0, 8, (code)+16, pal,             \
         8, 8, (code)+17, pal+1,           \
+        128                               \
+    };
+
+// Define a 3x1 Metasprite for Pipe body and brim
+#define DEF_METASPRITE_3x1(name,code,pal) \
+    const unsigned char name[]={          \
+        0, 0, (code)+0, pal,              \
+        8, 0, (code)+1, pal+1,            \
+	16, 0, (code)+2, pal,             \
         128                               \
     };
 
@@ -112,7 +123,7 @@ $ xC: Cyan
 const char PALETTE[32] = { 
   0x21,			            // screen color             ~sky
   0x19,0x29,0x39,0x00,	            // background palette 0     ~grass  
-  0x19,0x27,0x37,0x00,	            // background palette 1     ~ground
+  0x0F,0x27,0x37,0x00,	            // background palette 1     ~ground
   0x19,0x2C,0x39,0x00,	            // background palette 2     ~bushes
   0x2C,0x3D,0x30,0x00,              // background palette 3     ~buildings and clouds
 
@@ -128,8 +139,8 @@ const char PALETTE[32] = {
 //--------------------------------------------------------//
 
 DEF_METASPRITE_2x2(bird, 0x111, 0); // define bird metasprite
-
-
+DEF_METASPRITE_3x1(pipe_body, 0x151, 2); // define pipe body metasprite
+DEF_METASPRITE_3x1(pipe_brim, 0x161, 2); // define pipe brim metasprite
 
 
 
@@ -280,9 +291,13 @@ void main(void)
     
     update_player();
     
-
-    
     oam_id = oam_meta_spr(PLAYER_INIT_X, player_y, oam_id, bird); // draw flappy bird metasprite
+    oam_id = oam_meta_spr(200, 21, oam_id, pipe_body); // draw pipe body metasprite
+    oam_id = oam_meta_spr(200, 29, oam_id, pipe_body); // draw pipe body metasprite
+    oam_id = oam_meta_spr(200, 37, oam_id, pipe_body); // draw pipe body metasprite
+    oam_id = oam_meta_spr(200, 45, oam_id, pipe_brim); // draw pipe brim metasprite
+    
+    oam_id = oam_meta_spr(200, 190, oam_id, pipe_body); // draw pipe body metasprite
     
     ppu_wait_nmi();
     
