@@ -54,6 +54,9 @@
 //                 CONSTANTS AND DEFINES                  //
 //--------------------------------------------------------//
 
+// vertical mirroring (horizontal scroling)
+#define NES_MIRRORING 1
+
 #define PLAYER_INIT_X 50                 // Initial X position in pixels
 #define PLAYER_INIT_Y 50                 // Initial Y position in pixels
 
@@ -272,15 +275,16 @@ void main(void)
   while(1) {
     char oam_id = 0; // variable to draw sprites
     
-    oam_id = oam_spr(20, 18, 0x11E, OAM_BEHIND, oam_id); // sprite zero for splitting screen
-    
+    oam_id = oam_spr(20, 20, 0x11E, OAM_BEHIND, oam_id); // sprite zero for splitting screen
+    scroll_horizontal();
     
     update_player();
     
-    scroll_horizontal();
+
+    
     oam_id = oam_meta_spr(PLAYER_INIT_X, player_y, oam_id, bird); // draw flappy bird metasprite
     
-    
+    ppu_wait_nmi();
     
   }
   
