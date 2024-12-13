@@ -54,8 +54,15 @@
 //                 CONSTANTS AND DEFINES                  //
 //--------------------------------------------------------//
 
+#define PLAYER_INIT_X 50                 // Initial X position in pixels
+#define PLAYER_INIT_Y 50                 // Initial Y position in pixels
 
+#define SUBPIXELS 16                     // Subpixels per pixel (for smoother movement)
 
+#define GRAVITY 8                       // Gravity applied to the player
+#define MAX_GRAVITY 80
+
+#define JUMP_SPEED -120 
 
 
 //-------------------- METASPRITES -----------------------//
@@ -129,8 +136,11 @@ DEF_METASPRITE_2x2(bird, 0x111, 0); // define bird metasprite
 
 
 int scroll_x = 0; // x scroll position
-int scroll_dx = 1; // x scroll direction
+int scroll_x_vel = 1; // x scroll direction
 
+int player_y = 0; // player y position
+int player_y_sub = 0;
+int player_y_vel_sub = 0; // player y velocity
 
 
 
@@ -145,6 +155,14 @@ int scroll_dx = 1; // x scroll direction
 void setup_graphics();
 void scroll_horizontal();
 
+void initialize_player();
+void update_player();
+
+void handle_player_input();
+void apply_player_physics();
+void handle_player_movement(); 
+
+void player_jump();
 
 
 //--------------------------------------------------------//
@@ -165,8 +183,69 @@ void scroll_horizontal() {
   // waits for NMI, which means no frame-skip?
   split(scroll_x, 0);
   // update scroll_x variable
-  scroll_x += scroll_dx;
+  scroll_x += scroll_x_vel;
 
+}
+
+void initialize_player() {
+   player_y = PLAYER_INIT_Y; // player y position
+}
+
+void update_player() {
+  handle_player_input();
+  apply_player_physics();
+  handle_player_movement();
+}
+
+void handle_player_input() {
+  char controller_1 = pad_trigger(0);
+  
+  if ((controller_1 & PAD_A)) {
+        player_jump();  // Initiate jump
+    }
+  
+}
+
+void apply_player_physics() {
+  player_y_vel_sub += GRAVITY;
+  
+  // Cap the fall speed
+  if (player_y_vel_sub > MAX_GRAVITY) {
+    player_y_vel_sub = MAX_GRAVITY;
+  }
+}
+
+void handle_player_movement() {
+  int pixel_movement = 0;
+  int new_y = player_y;
+
+  // Update the subpixel position by adding the velocity (in subpixels)
+  player_y_sub += player_y_vel_sub;
+  
+  // Convert subpixels to full pixels when it exceeds 16 subpixels 
+  while (abs(player_y_sub) >= SUBPIXELS) {
+      if (player_y_sub > 0) {                // if player is falling
+          pixel_movement++;
+          player_y_sub -= SUBPIXELS;
+      } else {                               // if player is going up
+          pixel_movement--;
+          player_y_sub += SUBPIXELS;
+      }
+  }
+  
+  new_y += pixel_movement;
+  
+  // Keep the player in the screen
+  if (new_y < 18) new_y = 19;
+  if (new_y > 186) new_y = 185;
+  
+  // Update player position
+  player_y = new_y;
+  
+}
+
+void player_jump() {
+  player_y_vel_sub = JUMP_SPEED;
 }
 
 //--------------------------------------------------------//
@@ -174,9 +253,7 @@ void scroll_horizontal() {
 //--------------------------------------------------------//
 
 void main(void)
-{
-  char oam_id = 0; // variable to draw sprites
-  
+{ 
   setup_graphics();
   // draw background  
   vram_adr(NAMETABLE_A);
@@ -189,12 +266,22 @@ void main(void)
   // enable rendering
   ppu_on_all();
   
+  initialize_player();
+  
   // infinite loop
   while(1) {
+    char oam_id = 0; // variable to draw sprites
+    
     oam_id = oam_spr(20, 18, 0x11E, OAM_BEHIND, oam_id); // sprite zero for splitting screen
-    oam_id = oam_meta_spr(50, 50, oam_id, bird); // draw flappy bird metasprite
+    
+    
+    update_player();
     
     scroll_horizontal();
+    oam_id = oam_meta_spr(PLAYER_INIT_X, player_y, oam_id, bird); // draw flappy bird metasprite
+    
+    
+    
   }
   
 }
