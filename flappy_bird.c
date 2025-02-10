@@ -240,7 +240,7 @@ void handle_player_movement() {
   new_y += pixel_movement;
   
   // Keep the player in the screen
-  if (new_y < 18) new_y = 19;
+  if (new_y < 27) new_y = 28;
   if (new_y > 186) new_y = 185;
   
   // Update player position
