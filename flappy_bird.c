@@ -49,6 +49,7 @@
 
 // Game Nametables
 #include "nametable_game.h"
+#include "nametable_game_pipes.h"
 
 //--------------------------------------------------------//
 //                 CONSTANTS AND DEFINES                  //
@@ -62,12 +63,14 @@
 
 #define SUBPIXELS 16                     // Subpixels per pixel (for smoother movement)
 
-#define GRAVITY 8                       // Gravity applied to the player
+#define GRAVITY 5                       // Gravity applied to the player
 #define MAX_GRAVITY 80
 
-#define JUMP_SPEED -120 
+#define JUMP_SPEED -85 
 
 #define PIPE_INIT_Y 21
+
+#define SCROLL_X_SPEED 1
 
 
 //-------------------- METASPRITES -----------------------//
@@ -81,16 +84,6 @@
         8, 8, (code)+17, pal+1,           \
         128                               \
     };
-
-// Define a 3x1 Metasprite for Pipe body and brim
-#define DEF_METASPRITE_3x1(name,code,pal) \
-    const unsigned char name[]={          \
-        0, 0, (code)+0, pal,              \
-        8, 0, (code)+1, pal+1,            \
-	16, 0, (code)+2, pal,             \
-        128                               \
-    };
-
 
 
 //--------------------------------------------------------//
@@ -139,8 +132,6 @@ const char PALETTE[32] = {
 //--------------------------------------------------------//
 
 DEF_METASPRITE_2x2(bird, 0x111, 0); // define bird metasprite
-DEF_METASPRITE_3x1(pipe_body, 0x151, 2); // define pipe body metasprite
-DEF_METASPRITE_3x1(pipe_brim, 0x161, 2); // define pipe brim metasprite
 
 
 
@@ -150,7 +141,6 @@ DEF_METASPRITE_3x1(pipe_brim, 0x161, 2); // define pipe brim metasprite
 
 
 int scroll_x = 0; // x scroll position
-int scroll_x_vel = 1; // x scroll direction
 
 int player_y = 0; // player y position
 int player_y_sub = 0;
@@ -197,7 +187,7 @@ void scroll_horizontal() {
   // waits for NMI, which means no frame-skip?
   split(scroll_x, 0);
   // update scroll_x variable
-  scroll_x += scroll_x_vel;
+  scroll_x += SCROLL_X_SPEED;
 
 }
 
@@ -274,7 +264,7 @@ void main(void)
   vram_write(nametable_game, 1024);
   
   vram_adr(NAMETABLE_B);
-  vram_write(nametable_game, 1024);
+  vram_write(nametable_game_pipes, 1024);
 
   
   // enable rendering
@@ -292,12 +282,6 @@ void main(void)
     update_player();
     
     oam_id = oam_meta_spr(PLAYER_INIT_X, player_y, oam_id, bird); // draw flappy bird metasprite
-    oam_id = oam_meta_spr(200, 21, oam_id, pipe_body); // draw pipe body metasprite
-    oam_id = oam_meta_spr(200, 29, oam_id, pipe_body); // draw pipe body metasprite
-    oam_id = oam_meta_spr(200, 37, oam_id, pipe_body); // draw pipe body metasprite
-    oam_id = oam_meta_spr(200, 45, oam_id, pipe_brim); // draw pipe brim metasprite
-    
-    oam_id = oam_meta_spr(200, 190, oam_id, pipe_body); // draw pipe body metasprite
     
     ppu_wait_nmi();
     
