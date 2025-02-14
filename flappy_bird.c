@@ -68,9 +68,7 @@
 
 #define JUMP_SPEED -85 
 
-#define PIPE_INIT_Y 21
-
-#define SCROLL_X_SPEED 1
+#define SCROLL_X_SPEED 18
 
 
 //-------------------- METASPRITES -----------------------//
@@ -115,15 +113,15 @@ $ xC: Cyan
 /*{pal:"nes",layout:"nes"}*/
 const char PALETTE[32] = { 
   0x21,			            // screen color             ~sky
-  0x19,0x29,0x39,0x00,	            // background palette 0     ~grass  
-  0x0F,0x27,0x37,0x00,	            // background palette 1     ~ground
-  0x19,0x2C,0x39,0x00,	            // background palette 2     ~bushes
-  0x2C,0x3D,0x30,0x00,              // background palette 3     ~buildings and clouds
+  0x19,0x29,0x39,0x00,	            // background palette 0     ~grass and pipes  
+  0x0F,0x27,0x37,0x00,	            // background palette 1     ~ground and score
+  0x25,0x25,0x25,0x00,	            // background palette 2     ~
+  0x25,0x33,0x30,0x00,              // background palette 3     ~buildings and clouds
 
   0x0F,0x28,0x30,0x00,	            // sprite palette 0         ~bird body
   0x0F,0x28,0x16,0x00,	            // sprite palette 1         ~bird mouth
-  0x0F,0x1B,0x2A,0x00,	            // sprite palette 2         ~pipe shadow
-  0x0F,0x2A,0x3A	            // sprite palette 3         ~pipe light
+  0x25,0x25,0x25,0x00,	            // sprite palette 2         ~
+  0x25,0x25,0x25	            // sprite palette 3         ~
 };
 
 
@@ -140,15 +138,14 @@ DEF_METASPRITE_2x2(bird, 0x111, 0); // define bird metasprite
 //--------------------------------------------------------//
 
 
-int scroll_x = 0; // x scroll position
-
-int player_y = 0; // player y position
-int player_y_sub = 0;
-int player_y_vel_sub = 0; // player y velocity
+int scroll_x = 0;                     // x scroll position
+int scroll_x_sub = 0;                 // x scroll position (subpixel)
+int scroll_x_vel = SCROLL_X_SPEED;    // x scroll velocity in subpixels
 
 
-
-
+int player_y = 0;                     // player y position
+int player_y_sub = 0;                 // player y position (subpixel)
+int player_y_vel = 0;                 // player y velocity in subpixels
 
 
 //--------------------------------------------------------//
@@ -168,89 +165,149 @@ void handle_player_movement();
 
 void player_jump();
 
+int apply_subpixel_movement(int *position, int *subpixel, int velocity);
+
 
 //--------------------------------------------------------//
 //                       FUNCTIONS                        //
 //--------------------------------------------------------//
 
 
-// setup PPU and tables
+/*
+ * Initializes PPU and graphics-related settings.
+ * - Clears sprite memory (OAM buffer) to hide all sprites.
+ * - Sets the color palette for background and sprites.
+ * - Selects CHR bank 0 for background tiles.
+ * - Selects CHR bank 1 for sprite tiles.
+ */
 void setup_graphics() {
-  oam_clear();             // clear OAM buffer, all the sprites are hidden
-  pal_all(PALETTE);        // set palette colors
-  bank_bg(0);              // select chr bank 0 for background
-  bank_spr(1);             // select chr bank 1 for sprites
+  oam_clear();             // Clear OAM buffer, hiding all sprites
+  pal_all(PALETTE);        // Load predefined color palette
+  bank_bg(0);              // Use CHR bank 0 for background tiles
+  bank_spr(1);             // Use CHR bank 1 for sprite tiles
 }
 
+
+/*
+ * Handles horizontal scrolling of the background.
+ * - Uses subpixel precision for smooth scrolling.
+ * - Updates `scroll_x` using `apply_subpixel_movement()`.
+ * - Sets the scroll register using `split()`.
+ */
 void scroll_horizontal() {
-  // set scroll register
-  // waits for NMI, which means no frame-skip?
-  split(scroll_x, 0);
-  // update scroll_x variable
-  scroll_x += SCROLL_X_SPEED;
-
+  apply_subpixel_movement(&scroll_x, &scroll_x_sub, scroll_x_vel);
+  split(scroll_x, 0);  // Update the NES scroll position
 }
 
+
+/*
+ * Initializes the player’s position.
+ * - Sets `player_y` to the predefined initial value.
+ */
 void initialize_player() {
-   player_y = PLAYER_INIT_Y; // player y position
+   player_y = PLAYER_INIT_Y; // Set player’s initial Y position
 }
 
+
+/*
+ * Updates all aspects of the player’s movement each frame.
+ * - Reads player input.
+ * - Applies physics (gravity).
+ * - Updates player movement using subpixel calculations.
+ */
 void update_player() {
-  handle_player_input();
-  apply_player_physics();
-  handle_player_movement();
+  handle_player_input();   // Process controller input
+  apply_player_physics();  // Apply gravity and movement physics
+  handle_player_movement();// Move player based on updated values
 }
 
+
+/*
+ * Handles input from the controller.
+ * - Reads button presses from Controller 1.
+ * - Triggers jump action if the A button is pressed.
+ */
 void handle_player_input() {
-  char controller_1 = pad_trigger(0);
+  char controller_1 = pad_trigger(0);  // Read input from player 1
   
-  if ((controller_1 & PAD_A)) {
-        player_jump();  // Initiate jump
-    }
-  
-}
-
-void apply_player_physics() {
-  player_y_vel_sub += GRAVITY;
-  
-  // Cap the fall speed
-  if (player_y_vel_sub > MAX_GRAVITY) {
-    player_y_vel_sub = MAX_GRAVITY;
+  if (controller_1 & PAD_A) {  
+    player_jump();  // Initiate jump if A is pressed
   }
 }
 
+
+/*
+ * Applies gravity to the player's velocity.
+ * - Increases downward velocity each frame.
+ * - Caps fall speed to `MAX_GRAVITY` to prevent excessive falling speed.
+ */
+void apply_player_physics() {
+  player_y_vel += GRAVITY;  // Apply gravity to player velocity
+  
+  // Limit fall speed
+  if (player_y_vel > MAX_GRAVITY) {
+    player_y_vel = MAX_GRAVITY;
+  }
+}
+
+
+/*
+ * Makes the player jump.
+ * - Sets `player_y_vel` to a negative value (JUMP_SPEED) to move upward.
+ */
+void player_jump() {
+  player_y_vel = JUMP_SPEED;
+}
+
+
+/*
+ * Handles vertical movement of the player using subpixels.
+ * - Uses `apply_subpixel_movement()` to process smooth movement.
+ * - Ensures the player stays within the screen bounds.
+ */
 void handle_player_movement() {
-  int pixel_movement = 0;
   int new_y = player_y;
 
-  // Update the subpixel position by adding the velocity (in subpixels)
-  player_y_sub += player_y_vel_sub;
+  // Apply subpixel movement for smoother motion
+  apply_subpixel_movement(&new_y, &player_y_sub, player_y_vel);
   
-  // Convert subpixels to full pixels when it exceeds 16 subpixels 
-  while (abs(player_y_sub) >= SUBPIXELS) {
-      if (player_y_sub > 0) {                // if player is falling
-          pixel_movement++;
-          player_y_sub -= SUBPIXELS;
-      } else {                               // if player is going up
-          pixel_movement--;
-          player_y_sub += SUBPIXELS;
-      }
-  }
+  // Prevent the player from moving outside the screen bounds
+  if (new_y < 27) new_y = 28;   // Prevent moving too high
+  if (new_y > 186) new_y = 185; // Prevent moving too low
   
-  new_y += pixel_movement;
-  
-  // Keep the player in the screen
-  if (new_y < 27) new_y = 28;
-  if (new_y > 186) new_y = 185;
-  
-  // Update player position
-  player_y = new_y;
-  
+  player_y = new_y;  // Update player position
 }
 
-void player_jump() {
-  player_y_vel_sub = JUMP_SPEED;
+
+/*
+ * Applies subpixel-based movement and returns full pixel change.
+ * - Takes a position pointer, subpixel pointer, and velocity.
+ * - Accumulates velocity into subpixels.
+ * - Converts subpixels to whole pixels when they exceed `SUBPIXELS` threshold.
+ * - Returns the number of full pixels moved.
+ */
+int apply_subpixel_movement(int *position, int *subpixel, int velocity) {
+    int pixel_movement = 0;
+
+    *subpixel += velocity;  // Update subpixel position with velocity
+
+    // Convert accumulated subpixels into full pixels
+    while (abs(*subpixel) >= SUBPIXELS) {  
+        if (*subpixel > 0) {      
+            pixel_movement++;
+            *subpixel -= SUBPIXELS;
+        } else {                
+            pixel_movement--;
+            *subpixel += SUBPIXELS;
+        }
+    }
+
+    *position += pixel_movement;  // Update main position with pixel movement
+    return pixel_movement;        // Return how many pixels were moved
 }
+
+
+
 
 //--------------------------------------------------------//
 //                    MAIN GAME LOOP                      //
@@ -276,7 +333,7 @@ void main(void)
   while(1) {
     char oam_id = 0; // variable to draw sprites
     
-    oam_id = oam_spr(20, 20, 0x11E, OAM_BEHIND, oam_id); // sprite zero for splitting screen
+    oam_id = oam_spr(20, 30, 0x11E, OAM_BEHIND, oam_id); // sprite zero for splitting screen
     scroll_horizontal();
     
     update_player();
