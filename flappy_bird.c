@@ -40,6 +40,7 @@
 // Arithmetic and VRAM Utilities
 #include "bcd.h"                    // BCD arithmetic support
 //#link "bcd.c"
+
 #include "vrambuf.h"                // VRAM update buffer
 //#link "vrambuf.c"
 
@@ -345,3 +346,126 @@ void main(void)
   }
   
 }
+
+
+
+
+
+
+/* Reference Tileset
+
+    0 = none, 1 = pipe_brim, 2 = pipe_body_sky, 
+    3 = pipe_body_city, 4 = pipe_body_floor,
+    5 = flat color, 6 = floor_stripes, 7 = floor_line,
+    8 = floor_shadow, 9 = bushes, a = buildings, b = clouds
+  
+    0  1  2  3  4  5  6  7  8  9  a  b  c  d  e  f
+    
+    0, 0, 0, 5, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,    0
+    0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,    1
+    0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,    2
+    0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,    3
+    0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,    4
+    0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,    5
+    0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,    6
+    0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,    7
+    0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,    8
+    0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,    9
+    0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,    a
+    0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,    b
+    b, b, b, b, 0, 0, 0, 0, 0, 0, 0, 0, 1, 1, 1, 1,    c
+    a, a, a, a, 0, 0, 0, 7, 7, 0, 0, 0, 2, 2, 2, 2,    d
+    a, a, a, a, 0, 0, 0, 6, 6, 0, 0, 0, 3, 3, 3, 3,    e
+    9, 9, 9, 9, 0, 0, 0, 8, 8, 0, 0, 0, 4, 4, 4, 4,    f
+*/
+
+/* 
+    COlumn of 4 tiles
+    
+    0xd5, 0xd5, 0xd5, 0xd5      - score board upper line
+    0x03, 0x03, 0x03, 0x03      - score board fill
+    0x03, 0x03, 0x03, 0x03      - score board fill
+    0xf5, 0xf5, 0xf5, 0xf5      - score board lower line
+    0x00, 0x00, 0x00, 0x00      - sky
+    0x00, 0x00, 0x00, 0x00      - sky
+    0x00, 0x00, 0x00, 0x00      - sky
+    0x00, 0x00, 0x00, 0x00      - sky
+    0x00, 0x00, 0x00, 0x00      - sky
+    0x00, 0x00, 0x00, 0x00      - sky
+    0x00, 0x00, 0x00, 0x00      - sky
+    0x00, 0x00, 0x00, 0x00      - sky
+    0x00, 0x00, 0x00, 0x00      - sky
+    0x00, 0x00, 0x00, 0x00      - sky
+    0x00, 0x00, 0x00, 0x00      - sky
+    0x00, 0x00, 0x00, 0x00      - sky
+    0x00, 0x00, 0x00, 0x00      - sky
+    0x00, 0x00, 0x00, 0x00      - sky
+    0xc0, 0xc1, 0xc2, 0xc3      - cloud shapes
+    0x03, 0x03, 0x03, 0x03      - cloud fill
+    0xd0, 0xd1, 0xd2, 0xd3      - buildings top
+    0xe0, 0xe1, 0xe2, 0xe3      - buildings bottom
+    0xf0, 0xf1, 0xf2, 0xf3      - bushes shapes
+    0x03, 0x03, 0x03, 0x03      - bushes fill
+    0xd7, 0xd7, 0xd7, 0xd7      - floor line
+    0xe7, 0xe8, 0xe7, 0xe8      - floor stripes
+    0xf7, 0xf7, 0xf7, 0xf7      - floor shadow
+    0x03, 0x03, 0x03, 0x03      - dirt
+    0x03, 0x03, 0x03, 0x03      - dirt 
+    0x03, 0x03, 0x03, 0x03      - dirt
+    
+*/
+    
+/* 
+    after scroling horizontally 12 tiles, a pipe will be generated
+    
+    for the pipes
+    
+    - generate a random number "a" of the array: {2, 4, 6, 8, 10}
+    - this number "a" represents the number of pipe_body_sky for the upper pipe
+    - draw the pipe_body_sky for "a" times, starting right after the score board, on the 5th tile 
+    - draw the pipe_brim for the upper pipe
+    
+    - now we draw the 7 tiles (gap between pipes)
+    - if "a" is 2, 4 or 6 draw sky 7 times
+    - else if "a" is 8, draw sky 5 times, then cloud shapes, then cloud fill 
+    - else if "a" is 10, draw sky 3 times, then cloud shapes, then cloud fill, then buildings top, then buildings bottom
+    
+    - draw the pipe_brim for the lower pipe
+    - if "a" is 2, draw pipe_body_sky 3 times, then pipe_body_city 6 times
+    - else if "a" is 4, draw pipe_body_sky, then pipe_body_city 6 times
+    - else if "a" is 6, draw pipe_body_city 5 times 
+    - else if "a" is 8, draw pipe_body_city 3 times
+    - else if "a" is 10, draw pipe_body_city 
+    - draw the pipe_body_floor
+    
+    ex: "a" is 4
+    
+    0xd5, 0xd5, 0xd5, 0xd5      - score board upper line
+    0x03, 0x03, 0x03, 0x03      - score board fill
+    0x03, 0x03, 0x03, 0x03      - score board fill
+    0xf5, 0xf5, 0xf5, 0xf5      - score board lower line    
+    0xdc, 0xdd, 0xde, 0xdf      - pipe_body_sky
+    0xdc, 0xdd, 0xde, 0xdf      - pipe_body_sky
+    0xdc, 0xdd, 0xde, 0xdf      - pipe_body_sky
+    0xdc, 0xdd, 0xde, 0xdf      - pipe_body_sky
+    0xcc, 0xcd, 0xce, 0xcf      - pipe_body_brim
+    0x00, 0x00, 0x00, 0x00      - sky
+    0x00, 0x00, 0x00, 0x00      - sky
+    0x00, 0x00, 0x00, 0x00      - sky
+    0x00, 0x00, 0x00, 0x00      - sky
+    0x00, 0x00, 0x00, 0x00      - sky
+    0x00, 0x00, 0x00, 0x00      - sky
+    0x00, 0x00, 0x00, 0x00      - sky                            
+    0xcc, 0xcd, 0xce, 0xcf      - pipe_body_brim
+    0xdc, 0xdd, 0xde, 0xdf      - pipe_body_sky
+    0xec, 0xed, 0xee, 0xef      - pipe_body_city
+    0xec, 0xed, 0xee, 0xef      - pipe_body_city
+    0xec, 0xed, 0xee, 0xef      - pipe_body_city
+    0xec, 0xed, 0xee, 0xef      - pipe_body_city
+    0xec, 0xed, 0xee, 0xef      - pipe_body_city
+    0xec, 0xed, 0xee, 0xef      - pipe_body_city
+    0xfc, 0xfd, 0xfe, 0xff      - pipe_body_floor
+  
+*/
+
+
