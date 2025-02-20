@@ -197,6 +197,12 @@ void setup_graphics() {
  */
 void scroll_horizontal() {
   apply_subpixel_movement(&scroll_x, &scroll_x_sub, scroll_x_vel);
+  
+  // Reset scroll_x when it completes both nametables (512 pixels)
+  if (scroll_x >= 512) {
+    scroll_x -= 512;
+  }
+  
   split(scroll_x, 0);  // Update the NES scroll position
 }
 
