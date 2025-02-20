@@ -73,7 +73,7 @@
 
 #define JUMP_SPEED -85 
 
-#define SCROLL_X_SPEED 16
+#define SCROLL_X_SPEED 12
 
 #define SCREEN_WIDTH 256
 #define SCREEN_HEIGHT 240
@@ -180,12 +180,12 @@ DEF_METASPRITE_2x2(bird, 0x111, 0); // define bird metasprite
 
 int scroll_x = 0;                     // x scroll position
 int scroll_x_sub = 0;                 // x scroll position (subpixel)
-char scroll_x_vel = SCROLL_X_SPEED;    // x scroll velocity in subpixels
+int scroll_x_vel = SCROLL_X_SPEED;    // x scroll velocity in subpixels
 
 
 int player_y = 0;                     // player y position
 int player_y_sub = 0;                 // player y position (subpixel)
-char player_y_vel = 0;                 // player y velocity in subpixels
+int player_y_vel = 0;                 // player y velocity in subpixels
 
 bool pipe_update_pending = false;  // Track if a pipe was updated this frame
 
@@ -207,7 +207,7 @@ void handle_player_movement();
 
 void player_jump();
 
-char apply_subpixel_movement(int *position, int *subpixel, char velocity);
+int apply_subpixel_movement(int *position, int *subpixel, int velocity);
 
 
 
@@ -238,9 +238,9 @@ void setup_graphics() {
 
 // Applies subpixel-based movement and returns full pixel change.
 
-char apply_subpixel_movement(int *position, int *subpixel, char velocity) {
+int apply_subpixel_movement(int *position, int *subpixel, int velocity) {
     // Takes a position pointer, subpixel pointer, and velocity.
-    byte pixel_movement = 0;
+    int pixel_movement = 0;
 
     *subpixel += velocity;  // Accumulates velocity into subpixels.
 
