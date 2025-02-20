@@ -24,7 +24,7 @@ void vrambuf_flush(void) {
   vrambuf_end();
   // wait for next frame to flush update buffer
   // this will also set the scroll registers properly
-  ppu_wait_frame();
+  ppu_wait_nmi();
   // clear the buffer
   vrambuf_clear();
 }

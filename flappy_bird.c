@@ -51,6 +51,7 @@
 // Game Nametables
 #include "nametable_game.h"
 #include "nametable_game_pipes.h"
+#include "nametable_game_test_colors.h"
 
 //--------------------------------------------------------//
 //                 CONSTANTS AND DEFINES                  //
@@ -62,6 +63,9 @@
 #define PLAYER_X 50                      // player X position in pixels
 #define PLAYER_INIT_Y 50                 // Initial Y position in pixels
 
+#define PLAYER_MIN_Y 27
+#define PLAYER_MAX_Y 186
+
 #define SUBPIXELS 16                     // Subpixels per pixel (for smoother movement)
 
 #define GRAVITY 5                       // Gravity applied to the player
@@ -69,7 +73,42 @@
 
 #define JUMP_SPEED -85 
 
-#define SCROLL_X_SPEED 20
+#define SCROLL_X_SPEED 16
+
+#define SCREEN_WIDTH 256
+#define SCREEN_HEIGHT 240
+#define TILE_SIZE 8
+
+#define STATUS_BAR_HEIGHT_TILES 4
+
+#define PIPE_WIDTH_TILES 4           // Pipe width in tiles (4 tiles wide)
+#define PIPE_GAP_TILES 7             // Fixed gap size in tiles
+#define PIPE_SPAWN_X 256             // New pipes spawn offscreen at x = 256
+#define MAX_PIPES 2                  // Maximum active pipes at a time
+
+// Pipe Metatile Definitions
+#define PIPE_BRIM_MT  0  // Brim (edge part of pipe)
+#define PIPE_BODY_MT  1  // Body (middle part of pipe)
+
+// Pipe metatile patterns (each row represents 4 tile-wide metatile)
+const char pipe_metatiles[2][4] = {
+    {0xCC, 0xCD, 0xCE, 0xCF}, // PIPE_BRIM_MT (Brim)
+    {0xDC, 0xDD, 0xDE, 0xDF}  // PIPE_BODY_MT (Body)
+};
+
+// Pipe Heights (Upper, Lower)
+const byte pipe_heights[5][2] = {
+    {3, 11}, {5, 9}, {7, 7}, {9, 5}, {11, 3}
+};
+
+// Pipe Structure
+typedef struct {
+    int x;    // Pipe x-position (moves left)
+    byte gap;  // Gap index (0-4, determining pipe height)
+} Pipe;
+
+// Pipe Array
+Pipe pipes[MAX_PIPES];
 
 
 //-------------------- METASPRITES -----------------------//
@@ -141,12 +180,14 @@ DEF_METASPRITE_2x2(bird, 0x111, 0); // define bird metasprite
 
 int scroll_x = 0;                     // x scroll position
 int scroll_x_sub = 0;                 // x scroll position (subpixel)
-int scroll_x_vel = SCROLL_X_SPEED;    // x scroll velocity in subpixels
+char scroll_x_vel = SCROLL_X_SPEED;    // x scroll velocity in subpixels
 
 
 int player_y = 0;                     // player y position
 int player_y_sub = 0;                 // player y position (subpixel)
-int player_y_vel = 0;                 // player y velocity in subpixels
+char player_y_vel = 0;                 // player y velocity in subpixels
+
+bool pipe_update_pending = false;  // Track if a pipe was updated this frame
 
 
 //--------------------------------------------------------//
@@ -166,7 +207,16 @@ void handle_player_movement();
 
 void player_jump();
 
-int apply_subpixel_movement(int *position, int *subpixel, int velocity);
+char apply_subpixel_movement(int *position, int *subpixel, char velocity);
+
+
+
+
+void update_pipes();
+void queue_pipe_update(int x_pos, byte gap_index);
+void set_metatile(int base_addr, byte x, byte y, const char metatile[4]);
+void init_pipes();
+
 
 
 //--------------------------------------------------------//
@@ -186,6 +236,31 @@ void setup_graphics() {
 
 
 
+// Applies subpixel-based movement and returns full pixel change.
+
+char apply_subpixel_movement(int *position, int *subpixel, char velocity) {
+    // Takes a position pointer, subpixel pointer, and velocity.
+    byte pixel_movement = 0;
+
+    *subpixel += velocity;  // Accumulates velocity into subpixels.
+
+    // Convert accumulated subpixels into full pixels
+    while (abs(*subpixel) >= SUBPIXELS) {  
+        if (*subpixel > 0) {      
+            pixel_movement++;
+            *subpixel -= SUBPIXELS;
+        } else {                
+            pixel_movement--;
+            *subpixel += SUBPIXELS;
+        }
+    }
+
+    *position += pixel_movement;  // Update main position with pixel movement
+    return pixel_movement;        // Return how many pixels were moved
+}
+
+
+
 // Handles horizontal scrolling of the background.
  
 void scroll_horizontal() {
@@ -198,8 +273,9 @@ void scroll_horizontal() {
   }
   
   // Sets the scroll register using `split()`.
-  split(scroll_x, 0);  // Update the NES scroll position
+  split(scroll_x, 0);  // Update the scroll position
 }
+
 
 
 
@@ -259,35 +335,73 @@ void handle_player_movement() {
   apply_subpixel_movement(&new_y, &player_y_sub, player_y_vel);
   
   // Prevent the player from moving outside the screen bounds
-  if (new_y < 27) new_y = 28;   // Prevent moving too high
-  if (new_y > 186) new_y = 185; // Prevent moving too low
+  if (new_y < PLAYER_MIN_Y) new_y = PLAYER_MIN_Y + 1;   // Prevent moving too high
+  if (new_y > PLAYER_MAX_Y) new_y = PLAYER_MAX_Y - 1; // Prevent moving too low
   
   player_y = new_y;  // Update player position
 }
 
 
 
-// Applies subpixel-based movement and returns full pixel change.
 
-int apply_subpixel_movement(int *position, int *subpixel, int velocity) {
-    // Takes a position pointer, subpixel pointer, and velocity.
-    int pixel_movement = 0;
 
-    *subpixel += velocity;  // Accumulates velocity into subpixels.
+// Update Pipe Positions & Spawn New Pipes
+void update_pipes() {
+    byte i;
+    byte pixels_moved = apply_subpixel_movement(&scroll_x, &scroll_x_sub, scroll_x_vel);
 
-    // Convert accumulated subpixels into full pixels
-    while (abs(*subpixel) >= SUBPIXELS) {  
-        if (*subpixel > 0) {      
-            pixel_movement++;
-            *subpixel -= SUBPIXELS;
-        } else {                
-            pixel_movement--;
-            *subpixel += SUBPIXELS;
+    for (i = 0; i < MAX_PIPES; i++) {
+        pipes[i].x -= pixels_moved;  // Move pipes left based on scroll speed
+
+        // If a pipe moves offscreen (x < -16), respawn it at 256 with a new height
+        if (pipes[i].x < -16 && !pipe_update_pending) {
+            pipes[i].x = PIPE_SPAWN_X;
+            pipes[i].gap = rand8() % 5;  // Assign a new random gap index
+            queue_pipe_update(pipes[i].x, pipes[i].gap);  // Queue VRAM update
+            pipe_update_pending = true;  // Ensure only one update per frame
         }
     }
+}
 
-    *position += pixel_movement;  // Update main position with pixel movement
-    return pixel_movement;        // Return how many pixels were moved
+// Queue Pipe Updates in VRAM Buffer
+void queue_pipe_update(int x_pos, byte gap_index) {
+    byte i;
+
+    // Determine the base nametable based on `scroll_x`
+    word base_addr = (scroll_x < 256) ? NAMETABLE_A : NAMETABLE_B;
+    byte tile_x = (x_pos % 256) / TILE_SIZE;
+
+    byte upper_height = pipe_heights[gap_index][0];
+    byte lower_height = pipe_heights[gap_index][1];
+
+    // --- Draw Upper Pipe ---
+    for (i = 0; i < upper_height - 1; i++) {
+        set_metatile(base_addr, tile_x, STATUS_BAR_HEIGHT_TILES + i, pipe_metatiles[PIPE_BODY_MT]);
+    }
+    set_metatile(base_addr, tile_x, STATUS_BAR_HEIGHT_TILES + upper_height - 1, pipe_metatiles[PIPE_BRIM_MT]);
+
+    // --- Draw Lower Pipe ---
+    set_metatile(base_addr, tile_x, STATUS_BAR_HEIGHT_TILES + upper_height + PIPE_GAP_TILES, pipe_metatiles[PIPE_BRIM_MT]);
+    for (i = 0; i < lower_height - 1; i++) {
+        set_metatile(base_addr, tile_x, STATUS_BAR_HEIGHT_TILES + upper_height + PIPE_GAP_TILES + 1 + i, pipe_metatiles[PIPE_BODY_MT]);
+    }
+}
+
+
+// Set Metatile Function (Writes to VRAM Buffer)
+void set_metatile(int base_addr, byte x, byte y, const char metatile[4]) {
+    word addr = base_addr + (y * 32) + x;  // Compute VRAM address
+
+    vrambuf_put(addr, metatile, 4);  // Send 4 bytes to the VRAM buffer queue
+}
+
+// Initialize Pipe System
+void init_pipes() {
+    byte i;
+    for (i = 0; i < MAX_PIPES; i++) {
+        pipes[i].x = PIPE_SPAWN_X + (i * 128); // Spread initial pipes evenly
+        pipes[i].gap = rand8() % 5;
+    }
 }
 
 
@@ -299,32 +413,43 @@ int apply_subpixel_movement(int *position, int *subpixel, int velocity) {
 
 void main(void)
 { 
+  ppu_off();  // Disable rendering while setting up
   setup_graphics();
-  // draw background  
+  
+  
+  vrambuf_clear();  // Clear VRAM buffer
+  set_vram_update(updbuf);  // Link VRAM update buffer
+  
+  
   vram_adr(NAMETABLE_A);
   vram_write(nametable_game, 1024);
   
   vram_adr(NAMETABLE_B);
-  vram_write(nametable_game_pipes, 1024);
+  vram_write(nametable_game, 1024);
 
   
   // enable rendering
   ppu_on_all();
   
   initialize_player();
+  init_pipes();  // Initialize pipes
   
   // infinite loop
   while(1) {
     char oam_id = 0; // variable to draw sprites
     
-    oam_id = oam_spr(20, 30, 0x11E, OAM_BEHIND, oam_id); // sprite zero for splitting screen
-    scroll_horizontal();
+    ppu_wait_nmi();  // Wait for the next frame
+    vrambuf_clear();  // Clear VRAM buffer each frame
     
-    update_player();
+    oam_id = oam_spr(1, 30, 0x11E, OAM_BEHIND, oam_id); // sprite zero for splitting screen
     
     oam_id = oam_meta_spr(PLAYER_X, player_y, oam_id, bird); // draw flappy bird metasprite
     
-    ppu_wait_nmi();
+    pipe_update_pending = false;  // Reset flag for new frame
+    
+    scroll_horizontal();
+    update_player();
+    update_pipes();       // Update and spawn pipes
     
   }
   
