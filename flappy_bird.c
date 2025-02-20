@@ -348,7 +348,7 @@ void handle_player_movement() {
 // Update Pipe Positions & Spawn New Pipes
 void update_pipes() {
     byte i;
-    byte pixels_moved = apply_subpixel_movement(&scroll_x, &scroll_x_sub, scroll_x_vel);
+    int pixels_moved = apply_subpixel_movement(&scroll_x, &scroll_x_sub, scroll_x_vel);
 
     for (i = 0; i < MAX_PIPES; i++) {
         pipes[i].x -= pixels_moved;  // Move pipes left based on scroll speed
@@ -368,7 +368,7 @@ void queue_pipe_update(int x_pos, byte gap_index) {
     byte i;
 
     // Determine the base nametable based on `scroll_x`
-    word base_addr = (scroll_x < 256) ? NAMETABLE_A : NAMETABLE_B;
+    int base_addr = (scroll_x < 256) ? NAMETABLE_A : NAMETABLE_B;
     byte tile_x = (x_pos % 256) / TILE_SIZE;
 
     byte upper_height = pipe_heights[gap_index][0];
@@ -390,7 +390,7 @@ void queue_pipe_update(int x_pos, byte gap_index) {
 
 // Set Metatile Function (Writes to VRAM Buffer)
 void set_metatile(int base_addr, byte x, byte y, const char metatile[4]) {
-    word addr = base_addr + (y * 32) + x;  // Compute VRAM address
+    int addr = base_addr + (y * 32) + x;  // Compute VRAM address
 
     vrambuf_put(addr, metatile, 4);  // Send 4 bytes to the VRAM buffer queue
 }
