@@ -103,7 +103,7 @@ const byte pipe_heights[5][2] = {
 
 // Pipe Structure
 typedef struct {
-    int x;    // Pipe x-position (moves left)
+    int x;     // Pipe x-position (moves left)
     byte gap;  // Gap index (0-4, determining pipe height)
 } Pipe;
 
@@ -187,7 +187,7 @@ int player_y = 0;                     // player y position
 int player_y_sub = 0;                 // player y position (subpixel)
 int player_y_vel = 0;                 // player y velocity in subpixels
 
-bool pipe_update_pending = false;  // Track if a pipe was updated this frame
+
 
 
 //--------------------------------------------------------//
@@ -354,11 +354,10 @@ void update_pipes() {
         pipes[i].x -= pixels_moved;  // Move pipes left based on scroll speed
 
         // If a pipe moves offscreen (x < -16), respawn it at 256 with a new height
-        if (pipes[i].x < -16 && !pipe_update_pending) {
+        if (pipes[i].x < -16  ) { 
             pipes[i].x = PIPE_SPAWN_X;
             pipes[i].gap = rand8() % 5;  // Assign a new random gap index
             queue_pipe_update(pipes[i].x, pipes[i].gap);  // Queue VRAM update
-            pipe_update_pending = true;  // Ensure only one update per frame
         }
     }
 }
@@ -416,6 +415,7 @@ void main(void)
   ppu_off();  // Disable rendering while setting up
   setup_graphics();
   
+  oam_spr(1, 30, 0x11E, OAM_BEHIND, 0); // sprite zero for splitting screen
   
   vrambuf_clear();  // Clear VRAM buffer
   set_vram_update(updbuf);  // Link VRAM update buffer
@@ -436,22 +436,22 @@ void main(void)
   
   // infinite loop
   while(1) {
-    char oam_id = 0; // variable to draw sprites
+    char oam_id = 4; // variable to draw sprites   
     
-    ppu_wait_nmi();  // Wait for the next frame
-    vrambuf_clear();  // Clear VRAM buffer each frame
+    ppu_wait_nmi();   // wait for NMI to ensure previous frame finished
+    vrambuf_clear();  // Clear VRAM buffer each frame immediately after NMI
+   
     
-    oam_id = oam_spr(1, 30, 0x11E, OAM_BEHIND, oam_id); // sprite zero for splitting screen
+    scroll_horizontal();
     
     oam_id = oam_meta_spr(PLAYER_X, player_y, oam_id, bird); // draw flappy bird metasprite
     
-    pipe_update_pending = false;  // Reset flag for new frame
-    
-    scroll_horizontal();
     update_player();
     update_pipes();       // Update and spawn pipes
     
   }
+  
+  // teste
   
 }
 
