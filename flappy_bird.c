@@ -24,7 +24,6 @@
                      
 */
 
-  // Branch vitor
 
 //-------------------------------------------------------//
 //                  LINKS AND INCLUDES                   //
@@ -51,8 +50,23 @@
 
 // Game Nametables
 #include "nametable_game.h"
-#include "nametable_game_pipes.h"
-#include "nametable_game_test_colors.h"
+
+// FamiTone Music and Sound Data
+//#link "famitone2.s"
+void __fastcall__ famitone_update(void);
+
+
+
+
+// Gameplay Music 
+//#link "music_data.s"
+extern char music_game[];
+
+
+
+// Sound Effects
+//#link "sfx_data.s"
+extern char sfx_game[];
 
 //--------------------------------------------------------//
 //                 CONSTANTS AND DEFINES                  //
@@ -124,6 +138,7 @@ typedef struct {
     int x;     // Pipe x-position (moves left)
     byte gap;  // Gap index (0-4, determining pipe height)
     byte slice_progress;  // Tracks how many tiles have been drawn
+    bool passed;  // Flag to track if the pipe has been passed
 } Pipe;
 
 // Pipe Array
@@ -193,6 +208,9 @@ int player_y_vel = 0;                 // player y velocity in subpixels
 bool player_alive = true;
 
 
+unsigned int score = 0;
+
+
 
 //--------------------------------------------------------//
 //                  FUNCTION PROTOTYPES                   //
@@ -200,6 +218,8 @@ bool player_alive = true;
 
 
 void setup_graphics();
+void setup_audio();
+
 void scroll_horizontal();
 
 void initialize_player();
@@ -229,6 +249,11 @@ void fade_in();
 void fade_out();
 void flash_screen();
 
+
+void seed_rng();
+
+void update_score_display();
+
 //--------------------------------------------------------//
 //                       FUNCTIONS                        //
 //--------------------------------------------------------//
@@ -242,6 +267,14 @@ void setup_graphics() {
   pal_all(PALETTE);        // Load predefined color palette for background and sprites
   bank_bg(0);              // Use CHR bank 0 for background tiles
   bank_spr(1);             // Use CHR bank 1 for sprite tiles
+}
+
+
+void setup_audio() {
+  famitone_init(music_game); // Initialize FamiTone with the menu music by default
+  sfx_init(sfx_game);             // Initialize sound effects
+  nmi_set_callback(famitone_update); // Set FamiTone update function to be called during NMI
+  music_play(0);
 }
 
 
@@ -285,8 +318,6 @@ void scroll_horizontal() {
     scroll_x -= 512;
   }
 
-  // Sets the scroll register using `split()`.
-  split(scroll_x, 0);  // Update the scroll position
 }
 
 
@@ -335,6 +366,7 @@ void apply_player_physics() {
  
 void player_jump() {
   if (player_alive) {
+        sfx_play(0, 0);
   	player_y_vel = JUMP_SPEED;    // Sets `player_y_vel` to a negative value (JUMP_SPEED) to move upward.
   }
 }
@@ -387,6 +419,7 @@ void update_pipes() {
       pipes[0].x = PIPE_SPAWN_X + 8;
       pipes[0].gap = rand8() % 5;
       pipes[0].slice_progress = 0;          // Reset drawing progress
+      pipes[0].passed = false;
       
     }
 
@@ -394,6 +427,7 @@ void update_pipes() {
       pipes[1].x = PIPE_SPAWN_X + 8;
       pipes[1].gap = rand8() % 5;
       pipes[1].slice_progress = 0;          // Reset drawing progress
+      pipes[1].passed = false;
     }
     
 }
@@ -485,6 +519,7 @@ word nametable_to_attribute_addr(word a) {
 // Function to check collision with pipes
 bool check_collision() {
     byte i;
+    bool collision = false;
 
     // Bird's adjusted hitbox
     byte bird_hitbox_top = player_y + BIRD_HITBOX_TOP_OFFSET;
@@ -498,14 +533,46 @@ bool check_collision() {
             
             // Get the Y-position of the gap
             byte gap_y = 56 + (pipes[i].gap * 16);
+          
+            // Increase score only if the player has just passed the pipe
+            if ((pipes[i].x < PLAYER_X) && (!pipes[i].passed)) {  
+                pipes[i].passed = true;  //  Mark pipe as passed
+                score++;  //  Increase score only once
+                sfx_play(7,4);
+                update_score_display();  //  Update score display
+            }
 
             // Check if the bird is within the gap
             if (bird_hitbox_top < gap_y || bird_hitbox_bottom > gap_y + 56) {
-                return true;  // Collision detected, player dies
+                collision = true;  // Collision detected, player dies
             }
         }
+  
+
     }
-    return false;  // No collision
+  
+  
+    return collision;  // No collision
+}
+
+
+void update_score_display() {
+    char score_str[3];  // Buffer to hold the score as a string
+
+    // Convert score to ASCII (0-9 tiles match ASCII table)
+    score_str[2] = '0' + (score % 10);           // Ones place
+    score_str[1] = '0' + ((score / 10) % 10);    // Tens place
+    score_str[0] = '0' + ((score / 100) % 10);   // Hundreds place
+
+    // Queue the score update in the VRAM buffer (tiles 7,1 - 9,1)
+    vrambuf_put(NTADR_A(7,1), score_str, 3);
+}
+
+
+
+
+void seed_rng() {
+    set_rand(nesclock());  // Use VBlank counter as the random seed
 }
 
 
@@ -556,6 +623,7 @@ void main(void)
 { 
   ppu_off();  // Disable rendering while setting up
   setup_graphics();
+  setup_audio();
 
   vram_adr(NAMETABLE_A);
   vram_write(nametable_game, 1024);
@@ -563,16 +631,17 @@ void main(void)
   vram_adr(NAMETABLE_B);
   vram_write(nametable_game, 1024);
   
-  
   vrambuf_clear();  // Clear VRAM buffer
   set_vram_update(updbuf);  // Link VRAM update buffer
 
-  
   // enable rendering
   ppu_on_all();
   
   initialize_player();
   initialize_pipes();
+  
+  // needs to happen when player gives first input
+  seed_rng();  // Set a different random seed every playthrough
   
   // infinite loop
   while(1) {
@@ -582,6 +651,9 @@ void main(void)
     
     ppu_wait_nmi();   // wait for NMI to ensure previous frame finished
     vrambuf_clear();  // Clear VRAM buffer each frame immediately after NMI
+    
+    // Sets the scroll register using `split()`.
+    split(scroll_x, 0);  // Update the scroll position
         
     oam_id = oam_meta_spr(PLAYER_X, player_y, oam_id, bird); // draw flappy bird metasprite
     
@@ -595,12 +667,13 @@ void main(void)
         if (check_collision()) {
             // Handle death (e.g., stop movement, show game over screen)
             player_alive = false;
-            //flash_screen();
+            music_stop();
+            sfx_play(4, 1);
+            
+            
         }
      }
-    
   }
-  
 
 }
 
