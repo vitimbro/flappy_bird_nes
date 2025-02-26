@@ -21,57 +21,61 @@ music_data_mega_man_2:
 
 @instruments:
 	.byte $30 ; 00 : WilyBass
-	.word @env2, @env3, @env3
+	.word @env4, @env6, @env6
 	.byte $00
 	.byte $30 ; 01 : WilyBassPow
-	.word @env2, @env7, @env3
+	.word @env4, @env10, @env6
 	.byte $00
 	.byte $30 ; 02 : WilyLeadDuty0
-	.word @env8, @env3, @env3
+	.word @env7, @env6, @env6
 	.byte $00
 	.byte $30 ; 03 : WilyLeadDuty0Tremolo
-	.word @env8, @env3, @env0
+	.word @env5, @env6, @env1
 	.byte $00
 	.byte $70 ; 04 : WilyLeadDuty1
-	.word @env5, @env3, @env3
+	.word @env3, @env6, @env6
 	.byte $00
 	.byte $70 ; 05 : WilyLeadDuty1Alt
-	.word @env8, @env3, @env3
+	.word @env5, @env6, @env6
 	.byte $00
 	.byte $70 ; 06 : WilyLeadDuty1Tremolo
-	.word @env8, @env3, @env0
+	.word @env5, @env6, @env1
 	.byte $00
 	.byte $b0 ; 07 : WilyLeadDuty2
-	.word @env6, @env3, @env3
+	.word @env2, @env6, @env6
 	.byte $00
 	.byte $f0 ; 08 : WilyLeadDuty3Tremolo
-	.word @env8, @env3, @env0
+	.word @env9, @env6, @env1
 	.byte $00
 	.byte $30 ; 09 : WilyNoiseDrumHi
-	.word @env1, @env3, @env3
+	.word @env8, @env6, @env6
 	.byte $00
 	.byte $30 ; 0a : WilyNoiseDrumLo
-	.word @env4, @env3, @env3
+	.word @env0, @env6, @env6
 	.byte $00
 
 @env0:
-	.byte $c1,$c0,$bf,$c1,$00,$01
+	.byte $c8,$c8,$c5,$02,$c3,$02,$c1,$c0,$00,$07
 @env1:
-	.byte $cf,$c5,$c5,$c0,$00,$03
+	.byte $c1,$c0,$bf,$c1,$00,$01
 @env2:
-	.byte $cf,$7f,$00,$00
+	.byte $c9,$0e,$c7,$0e,$c6,$0e,$c5,$00,$06
 @env3:
-	.byte $c0,$7f,$00,$01
+	.byte $c8,$02,$c7,$03,$c6,$03,$c5,$03,$c4,$03,$c3,$03,$c2,$00,$0c
 @env4:
-	.byte $cf,$cf,$cb,$02,$c7,$02,$c3,$c0,$00,$07
+	.byte $cf,$7f,$00,$00
 @env5:
-	.byte $ce,$02,$cd,$03,$cc,$03,$cb,$03,$ca,$03,$c9,$03,$c8,$03,$c7,$00,$0e
+	.byte $c8,$13,$c6,$13,$c4,$00,$04
 @env6:
-	.byte $cf,$0e,$ce,$0e,$cd,$0e,$cc,$00,$06
+	.byte $c0,$7f,$00,$01
 @env7:
-	.byte $c0,$c0,$be,$be,$bc,$bc,$bb,$00,$06
+	.byte $c7,$13,$c6,$13,$c5,$00,$04
 @env8:
-	.byte $cf,$13,$cd,$13,$ca,$00,$04
+	.byte $c7,$c3,$c2,$c0,$00,$03
+@env9:
+	.byte $c9,$13,$c7,$13,$c5,$00,$04
+@env10:
+	.byte $c0,$c0,$be,$be,$bc,$bc,$bb,$00,$06
 
 @samples:
 

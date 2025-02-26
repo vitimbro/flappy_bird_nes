@@ -57,7 +57,6 @@ void __fastcall__ famitone_update(void);
 
 
 
-
 // Gameplay Music 
 //#link "music_data.s"
 extern char music_game[];
@@ -366,7 +365,7 @@ void apply_player_physics() {
  
 void player_jump() {
   if (player_alive) {
-        sfx_play(0, 0);
+        sfx_play(2, 1);
   	player_y_vel = JUMP_SPEED;    // Sets `player_y_vel` to a negative value (JUMP_SPEED) to move upward.
   }
 }
