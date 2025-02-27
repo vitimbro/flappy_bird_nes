@@ -50,17 +50,18 @@
 
 // Game Nametables
 #include "nametable_game.h"
+#include "nametable_title.h"
+#include "nametable_death.h"
+
 
 // FamiTone Music and Sound Data
 //#link "famitone2.s"
 void __fastcall__ famitone_update(void);
 
 
-
 // Gameplay Music 
 //#link "music_data.s"
 extern char music_game[];
-
 
 
 // Sound Effects
@@ -71,21 +72,20 @@ extern char sfx_game[];
 //                 CONSTANTS AND DEFINES                  //
 //--------------------------------------------------------//
 
-// vertical mirroring (horizontal scroling)
-#define NES_MIRRORING 1
+#define NES_MIRRORING 1                  // Vertical mirroring (for horizontal scroling)
 
 #define PLAYER_X 50                      // player X position in pixels
 #define PLAYER_INIT_Y 50                 // Initial Y position in pixels
 
-#define PLAYER_MIN_Y 27
+#define PLAYER_MIN_Y 27                  
 #define PLAYER_MAX_Y 186
 
 #define SUBPIXELS 16                     // Subpixels per pixel (for smoother movement)
 
-#define GRAVITY 4                       // Gravity applied to the player
+#define GRAVITY 4                        // Gravity applied to the player
 #define MAX_GRAVITY 80
 
-#define JUMP_SPEED -64 
+#define JUMP_SPEED -68 
 
 #define SCROLL_X_SPEED 8 
 
@@ -112,11 +112,16 @@ extern char sfx_game[];
 #define FLASH_TIME 6
 
 
-
 #define BIRD_HITBOX_TOP_OFFSET  6   // Ignore top  pixels
 #define BIRD_HITBOX_BOTTOM_OFFSET 6  // Ignore bottom  pixels
 #define BIRD_HITBOX_LEFT_OFFSET  6   // Ignore left  pixels
 #define BIRD_HITBOX_RIGHT_OFFSET 3   // Ignore right  pixels
+
+
+// Game State Definitions
+#define STATE_MENU  0
+#define STATE_GAME  1
+#define STATE_DEATH 2
 
 
 
@@ -173,7 +178,7 @@ const char PALETTE[32] = {
   0x19,0x29,0x39,0x00,	            // background palette 0     ~grass and pipes  
   0x0F,0x27,0x37,0x00,	            // background palette 1     ~ground and score
   0x25,0x25,0x25,0x00,	            // background palette 2     ~
-  0x25,0x33,0x30,0x00,              // background palette 3     ~buildings and clouds
+  0x0F,0x33,0x30,0x00,              // background palette 3     ~buildings and clouds
 
   0x0F,0x28,0x30,0x00,	            // sprite palette 0         ~bird body
   0x0F,0x28,0x16,0x00,	            // sprite palette 1         ~bird mouth
@@ -204,10 +209,17 @@ int player_y = 0;                     // player y position
 int player_y_sub = 0;                 // player y position (subpixel)
 int player_y_vel = 0;                 // player y velocity in subpixels
 
-bool player_alive = true;
+bool player_alive = false;             // 
 
 
 unsigned int score = 0;
+
+
+// Game state variable
+unsigned char game_state = STATE_MENU; // Start with menu
+
+// Timer variable (stores frames left)
+unsigned int timer_frames = 0;
 
 
 
@@ -215,13 +227,28 @@ unsigned int score = 0;
 //                  FUNCTION PROTOTYPES                   //
 //--------------------------------------------------------//
 
+//--------------- Initialization and Setup ---------------//
 
 void setup_graphics();
 void setup_audio();
 
-void scroll_horizontal();
+void setup_menu();
+void setup_game();
+void setup_death();
+
+void update_menu();
+void update_game();
+void update_death();
+void check_game_state();
+
 
 void initialize_player();
+void initialize_pipes();
+
+
+void scroll_horizontal();
+
+
 void update_player();
 
 void handle_player_input();
@@ -234,7 +261,7 @@ int apply_subpixel_movement(int *position, int *subpixel, int velocity);
 
 
 
-void initialize_pipes();
+
 void update_pipes();
 void draw_pipe(byte pipe_index, int x_pos, byte gap_index, byte slice_progress);
 
@@ -244,14 +271,21 @@ word nametable_to_attribute_addr(word a);
 bool check_collision();
 
 
+void start_timer(unsigned int wait_time);
+bool timer_done();
+
+//---------------- HUD and Visual Effects ----------------//
+
 void fade_in();
 void fade_out();
 void flash_screen();
 
+void update_score_display();
+
+
+
 
 void seed_rng();
-
-void update_score_display();
 
 //--------------------------------------------------------//
 //                       FUNCTIONS                        //
@@ -262,10 +296,14 @@ void update_score_display();
 //  Initializes PPU and graphics-related settings.
  
 void setup_graphics() {
+  ppu_off();               // Disable rendering while setting up
   oam_clear();             // Clear OAM buffer, hiding all sprites
   pal_all(PALETTE);        // Load predefined color palette for background and sprites
   bank_bg(0);              // Use CHR bank 0 for background tiles
   bank_spr(1);             // Use CHR bank 1 for sprite tiles
+  
+  vrambuf_clear();          // Clear VRAM buffer
+  set_vram_update(updbuf);  // Link VRAM update buffer
 }
 
 
@@ -308,10 +346,8 @@ int apply_subpixel_movement(int *position, int *subpixel, int velocity) {
 void scroll_horizontal() {
   // Uses subpixel precision for smooth scrolling.
   
-  if (player_alive) {
-    apply_subpixel_movement(&scroll_x, &scroll_x_sub, scroll_x_vel); // Updates `scroll_x` using `apply_subpixel_movement()`.
-  }
-  
+  apply_subpixel_movement(&scroll_x, &scroll_x_sub, scroll_x_vel); // Updates `scroll_x` using `apply_subpixel_movement()`.
+   
   // Reset scroll_x when it completes both nametables (512 pixels)
   if (scroll_x >= 512) {
     scroll_x -= 512;
@@ -325,6 +361,10 @@ void scroll_horizontal() {
  
 void initialize_player() {
    player_y = PLAYER_INIT_Y; // Set player’s initial Y position
+   player_alive = true;
+
+   player_y_sub = 0;                 // player y position (subpixel)
+   player_y_vel = 0;                 // player y velocity in subpixels
 }
 
 
@@ -343,9 +383,21 @@ void update_player() {
 void handle_player_input() {
   char controller_1 = pad_trigger(0);  // Read input from player 1
   
-  if (controller_1 & PAD_A) {  
+  if ((controller_1 & PAD_A) && (player_alive)) {  
     player_jump();  // Initiate jump if A is pressed
   }
+  
+  if (!player_alive) {// Wait for Start button to return to the main menu
+      if (controller_1 & PAD_START) {
+          sfx_play(5,5);
+          fade_out(); // Fade out before changing the state
+
+          game_state = STATE_DEATH; // Switch back to menu
+          setup_death(); // Load menu nametable
+          fade_in();
+
+      }
+    }
 }
 
 
@@ -364,10 +416,10 @@ void apply_player_physics() {
 // Makes the player jump.
  
 void player_jump() {
-  if (player_alive) {
-        sfx_play(2, 1);
-  	player_y_vel = JUMP_SPEED;    // Sets `player_y_vel` to a negative value (JUMP_SPEED) to move upward.
-  }
+ 
+   sfx_play(2, 1);
+   player_y_vel = JUMP_SPEED;    // Sets `player_y_vel` to a negative value (JUMP_SPEED) to move upward.
+  
 }
 
 
@@ -397,7 +449,14 @@ void initialize_pipes() {
     byte i;  
     for (i = 0; i < MAX_PIPES; i++) {
       pipes[i].slice_progress = PIPE_WIDTH_TILES;          // Reset drawing progress
+      pipes[i].x = 0;
+      pipes[i].gap = 0;
+      pipes[i].passed = false;
     }
+  
+    scroll_x = 0;                     // x scroll position
+    scroll_x_sub = 0;                 // x scroll position (subpixel)
+    scroll_x_vel = SCROLL_X_SPEED;
 }
 
 
@@ -575,8 +634,23 @@ void seed_rng() {
 }
 
 
+// Start a timer with a given duration (in frames)
+void start_timer(unsigned int wait_time) {
+    timer_frames = wait_time;
+}
+
+// Check if the timer has finished (returns true when done)
+bool timer_done() {
+    if (timer_frames > 0) {
+        timer_frames--;  // Decrease timer every frame
+        return false;    // Timer still running
+    }
+    return true;  // Timer finished
+}
+
+
 //-----------------------------------------------------------------------------//
-//                        Fade In/Out And Flash Functions                      //          //
+//                        Fade In/Out And Flash Functions                      //          
 //-----------------------------------------------------------------------------//
 
 
@@ -599,52 +673,83 @@ void fade_out() {
 void flash_screen() {
     char i;
     pal_bright(8);        // Set screen to maximum brightness
-    delay(FLASH_TIME);    // Brief delay for the flash
-    pal_bright(2);        // Restore to intermediate brightness
-    delay(FLASH_TIME);    // Slight delay for visual impact
-    pal_bright(8);        // Flash again to make it more noticeable
-    delay(FLASH_TIME); 
-    pal_bright(2);
+    start_timer(FLASH_TIME);    // Brief delay for the flash
+    if (timer_done) pal_bright(2);        // Restore to intermediate brightness
+    start_timer(FLASH_TIME);    // Brief delay for the flash
+    if (timer_done) pal_bright(8);        // Restore to intermediate brightness
+    start_timer(FLASH_TIME); 
+    if (timer_done) pal_bright(2);        // Restore to intermediate brightness
     for (i = 2; i <= 4; ++i) {
-        pal_bright(i); // Increase brightness
-        delay(FLASH_TIME); // Wait for next frame
+        start_timer(FLASH_TIME); 
+        if (timer_done) pal_bright(i); // Increase brightness
     }
 }
 
 
 
 
-//--------------------------------------------------------//
-//                    MAIN GAME LOOP                      //
-//--------------------------------------------------------//
 
-void main(void)
-{ 
-  ppu_off();  // Disable rendering while setting up
-  setup_graphics();
-  setup_audio();
+//------------------------------- Setup States ------------------------------------//
 
+// Load the nametable for the menu state
+void setup_menu() { 
+  ppu_off(); // Turn off rendering to safely update VRAM
+  vram_adr(NAMETABLE_A);
+  vram_write(nametable_title, 1024);
+  ppu_on_all(); // Turn rendering back on
+}
+
+// Load the nametable for the game state
+void setup_game() {
+  ppu_off();                         // Turn off rendering to safely update VRAM
   vram_adr(NAMETABLE_A);
   vram_write(nametable_game, 1024);
   
   vram_adr(NAMETABLE_B);
   vram_write(nametable_game, 1024);
-  
-  vrambuf_clear();  // Clear VRAM buffer
-  set_vram_update(updbuf);  // Link VRAM update buffer
 
-  // enable rendering
-  ppu_on_all();
-  
-  initialize_player();
-  initialize_pipes();
-  
-  // needs to happen when player gives first input
-  seed_rng();  // Set a different random seed every playthrough
-  
-  // infinite loop
-  while(1) {
+  ppu_on_all(); // Turn rendering back on
+}
+
+// Load the nametable for the death state
+void setup_death() {
+  ppu_off(); // Turn off rendering to safely update VRAM
+  vram_adr(NAMETABLE_A);
+  vram_write(nametable_death, 1024);
+  ppu_on_all(); // Turn rendering back on
+
+}
+
+
+//------------------------------- Update States ------------------------------------//
+
+
+
+// Handle the menu state
+void update_menu() {
+  char controller_1 = pad_trigger(0);  // Read input from player 1
+  // Wait for Start button to begin the game
+  if (controller_1 & PAD_START) {
+    seed_rng();  // Set a different random seed every playthrough
+    
+    sfx_play(5,5);
+    fade_out(); // Fade out before changing the state
+    delay(60);
+    
+    game_state = STATE_GAME; // Switch to game state
+    setup_game(); // Load game nametable
+
+    fade_in(); // Fade in after loading the new state
+    initialize_pipes();
+    initialize_player();
+
+  }
+}
+
+// Handle the game state
+void update_game() {
     char oam_id = 0; // variable to draw sprites
+    char controller_1 = pad_trigger(0);  // Read input from player 1
     
     oam_id = oam_spr(30, 30, 0x11E, OAM_BEHIND, 0); // sprite zero for splitting screen
     
@@ -657,21 +762,72 @@ void main(void)
     oam_id = oam_meta_spr(PLAYER_X, player_y, oam_id, bird); // draw flappy bird metasprite
     
     update_player();
-    scroll_horizontal();
-    
-    if (player_alive) {
-              
-        update_pipes();       // Update and spawn pipes
+  
+    if (player_alive) scroll_horizontal();
+           
+    update_pipes();       // Update and spawn pipes
 
-        if (check_collision()) {
-            // Handle death (e.g., stop movement, show game over screen)
-            player_alive = false;
-            music_stop();
-            sfx_play(4, 1);
-            
-            
-        }
-     }
+    if ((player_alive) && (check_collision())) {
+      // Handle death (e.g., stop movement, show game over screen)
+      player_alive = false;
+      music_stop();
+      sfx_play(4, 1);    
+      scroll_x_sub = 0;     // x scroll position (subpixel)
+      scroll_x_vel = 0;    // x scroll velocity in subpixels
+    }
+  
+    
+    
+}
+
+
+// Handle the death state
+void update_death() {
+    char controller_1 = pad_trigger(0);  // Read input from player 1
+    
+ 
+    // Wait for Start button to return to the main menu
+    if (controller_1 & PAD_START) {
+        sfx_play(5,5);
+        fade_out(); // Fade out before changing the state
+
+        game_state = STATE_MENU; // Switch back to menu
+        setup_menu(); // Load menu nametable
+        fade_in();
+
+    }
+  
+}
+
+//------------------------------- Check State ------------------------------------//
+
+// Check the current game state and update accordingly
+void check_game_state() {
+    if (game_state == STATE_MENU) {
+        update_menu();
+    } else if (game_state == STATE_GAME) {
+        update_game();
+    } else if (game_state == STATE_DEATH) {
+        update_death();
+    }
+}
+
+
+//--------------------------------------------------------//
+//                    MAIN GAME LOOP                      //
+//--------------------------------------------------------//
+
+void main(void)
+{ 
+
+  setup_graphics();
+  setup_audio();
+  
+  setup_menu();
+  
+  // infinite main loop
+  while(1) {
+      check_game_state(); // Check and update based on the game state
   }
 
 }
