@@ -742,6 +742,7 @@ void update_menu() {
     fade_in(); // Fade in after loading the new state
     initialize_pipes();
     initialize_player();
+    score = 0;
 
   }
 }
