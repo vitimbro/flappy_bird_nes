@@ -239,6 +239,7 @@ bool player_alive = false;             //
 
 
 unsigned int score = 0;
+unsigned int record = 0;
 
 
 // Game state variable
@@ -414,17 +415,6 @@ void handle_player_input() {
     player_jump();  // Initiate jump if A is pressed
   }
   
-  if (!player_alive) {// Wait for Start button to return to the main menu
-      if (controller_1 & PAD_START) {
-          sfx_play(5,5);
-          fade_out(); // Fade out before changing the state
-
-          game_state = STATE_DEATH; // Switch back to menu
-          setup_death(); // Load menu nametable
-          fade_in();
-
-      }
-    }
 }
 
 
@@ -707,6 +697,10 @@ bool check_collision() {
                 score++;  //  Increase score only once
                 sfx_play(7,4);
                 update_score_display();  //  Update score display
+              
+                if (score > record) {
+                  record = score;
+                }
             }
 
             // Check if the bird is within the gap
@@ -730,8 +724,33 @@ void update_score_display() {
 
     // Queue the score update in the VRAM buffer (tiles 8,1 - 10,1)
     vrambuf_put(NTADR_A(8,1), score_str, 3);
+  
 }
 
+
+void update_death_display() {
+    char score_str[3];  // Buffer to hold the score as a string
+    char record_str[3];
+
+    // Convert score to ASCII (0-9 tiles match ASCII table)
+    score_str[2] = '0' + (score % 10);           // Ones place
+    score_str[1] = '0' + ((score / 10) % 10);    // Tens place
+    score_str[0] = '0' + ((score / 100) % 10);   // Hundreds place
+  
+    // Convert score to ASCII (0-9 tiles match ASCII table)
+    record_str[2] = '0' + (record % 10);           // Ones place
+    record_str[1] = '0' + ((record / 10) % 10);    // Tens place
+    record_str[0] = '0' + ((record / 100) % 10);   // Hundreds place
+  
+
+    // Queue the score and record update in the VRAM buffer 
+    vram_adr(NTADR_A(22,12));
+    vram_write(score_str, 3);
+  
+    vram_adr(NTADR_A(22,14));
+    vram_write(record_str, 3);  
+  
+}
 
 
 
@@ -776,20 +795,7 @@ void fade_out() {
     }
 }
 
-void flash_screen() {
-    char i;
-    pal_bright(8);        // Set screen to maximum brightness
-    start_timer(FLASH_TIME);    // Brief delay for the flash
-    if (timer_done) pal_bright(2);        // Restore to intermediate brightness
-    start_timer(FLASH_TIME);    // Brief delay for the flash
-    if (timer_done) pal_bright(8);        // Restore to intermediate brightness
-    start_timer(FLASH_TIME); 
-    if (timer_done) pal_bright(2);        // Restore to intermediate brightness
-    for (i = 2; i <= 4; ++i) {
-        start_timer(FLASH_TIME); 
-        if (timer_done) pal_bright(i); // Increase brightness
-    }
-}
+
 
 
 
@@ -823,6 +829,7 @@ void setup_death() {
   ppu_off(); // Turn off rendering to safely update VRAM
   vram_adr(NAMETABLE_A);
   vram_write(nametable_death, 1024);
+  update_death_display();
   ppu_on_all(); // Turn rendering back on
 
 }
@@ -906,7 +913,22 @@ void update_game() {
       sfx_play(4, 1);    
       scroll_x_sub = 0;     // x scroll position (subpixel)
       scroll_x_vel = 0;    // x scroll velocity in subpixels
+      pal_bright(8);
+      start_timer(100);
+      
     } 
+    else pal_bright(4);
+    
+    if ((!player_alive) && (timer_done())) {
+      sfx_play(5,5);
+      pal_bright(0);
+      
+      oam_hide_rest(0);
+
+      game_state = STATE_DEATH; // Switch back to menu
+      setup_death(); // Load menu nametable
+      fade_in();
+    }
     
 }
 
