@@ -77,15 +77,15 @@ extern char sfx_game[];
 #define PLAYER_X 50                      // player X position in pixels
 #define PLAYER_INIT_Y 50                 // Initial Y position in pixels
 
-#define PLAYER_MIN_Y 27                  
-#define PLAYER_MAX_Y 186
+#define PLAYER_MIN_Y 27                  // player upper limit
+#define PLAYER_MAX_Y 186		 // player bottom limit
 
 #define SUBPIXELS 16                     // Subpixels per pixel (for smoother movement)
 
 #define GRAVITY 4                        // Gravity applied to the player
 #define MAX_GRAVITY 80
 
-#define JUMP_SPEED -68 
+#define JUMP_SPEED -68 			
 
 #define SCROLL_X_SPEED 8 
 
@@ -102,10 +102,20 @@ extern char sfx_game[];
 #define PIPE_SPAWN_X 256             // New pipes spawn offscreen at x = 256
 #define MAX_PIPES 2                  // Maximum active pipes at a time
 
+#define CITY_HEIGHT 7
+
 // Pipe Metatile Definitions
-#define PIPE_BRIM_MT  0  // Brim (edge part of pipe)
-#define PIPE_BODY_MT  1  // Body (middle part of pipe)
-#define SKY 2            // Sky
+#define PIPE_BRIM  0  
+#define PIPE_BODY_SKY  1  
+#define SKY 2            
+
+#define CLOUDS_OUTLINE 3
+#define CLOUDS_FILLING 4
+#define BUIDINGS_TOP 5
+#define BUILDINGS_BOTTOM 6
+
+#define PIPE_BODY_CITY 7
+#define PIPE_BODY_FLOOR 8
 
 
 #define FADE_TIME 4                      // Fade in/out duration in frames
@@ -126,11 +136,20 @@ extern char sfx_game[];
 
 
 // Pipe metatile patterns (each row represents 4 tile-wide metatile)
-const char pipe_metatiles[3][4] = {
-    {0xCC, 0xCD, 0xCE, 0xCF},  // PIPE_BRIM_MT (Brim)
-    {0xDC, 0xDD, 0xDE, 0xDF},  // PIPE_BODY_MT (Body)
-    {0x00, 0x00, 0x00, 0x00}   // SKY
+const char pipe_metatiles[9][4] = {
+    {0xCC, 0xCD, 0xCE, 0xCF},   // PIPE_BRIM_MT (Brim)
+    {0xDC, 0xDD, 0xDE, 0xDF},   // PIPE_BODY_MT (Body)
+    {0x00, 0x00, 0x00, 0x00},   // SKY
+  
+    {0xC0, 0xC1, 0xC2, 0xC3},   // CLOUDS_OUTLINE
+    {0x03, 0x03, 0x03, 0x03},   // CLOUDS_FILLING
+    {0xD0, 0xD1, 0xD2, 0xD3},   // BUIDINGS_TOP
+    {0xE0, 0xE1, 0xE2, 0xE3},   // BUILDINGS_BOTTOM
+  
+    {0xEC, 0xED, 0xEE, 0xEF},   // PIPE_BODY_CITY 
+    {0xFC, 0xFD, 0xFE, 0xFF}    // PIPE_BODY_FLOOR 
 };
+
 
 // Pipe Heights (Upper, Lower)
 const byte pipe_heights[5][2] = {
@@ -151,6 +170,8 @@ Pipe pipes[MAX_PIPES];
 char pipe_buffer[PLAYROWS]; 
 
 char color_buffer[PLAYROWS / 4];  // Stores nametable attributes (1/4 size of nametable)
+
+
 
 
 //-------------------- METASPRITES -----------------------//
@@ -490,13 +511,27 @@ void update_pipes() {
     
 }
 
-// // Fills pipe_buffer with the correct tiles for the pipe slice
+// Fills pipe_buffer with the correct tiles for the pipe slice
 void draw_pipe(byte pipe_index, int x_pos, byte gap_index, byte slice_progress) {
     byte i;
 	
     byte tile_x;
+  	
+    byte background_tiles = 0;
+    byte offset = 0;
+  
     byte upper_height;
     byte lower_height;
+  
+    // Variables to handle number of tiles in each pipe height
+    int n_pipe_body_sky_upper;
+    int n_sky;
+    int n_background;
+    int n_pipe_body_sky_lower;
+    int n_pipe_body_city;
+  
+    byte cont = 0;
+  
   
     // Determine the base nametable based on scroll_x
     int base_addr; 
@@ -515,30 +550,101 @@ void draw_pipe(byte pipe_index, int x_pos, byte gap_index, byte slice_progress) 
     }
   
     tile_x = (x_pos % 256) / TILE_SIZE;
-
-    upper_height = pipe_heights[gap_index][0];
-    lower_height = pipe_heights[gap_index][1];
   
     // Clear the nametable buffer before writing
     memset(pipe_buffer, 0, sizeof(pipe_buffer));
   
+    memset(color_buffer, 0, sizeof(color_buffer)); // default: all palette 0
   
-     // --- Draw Upper Pipe ---
-    for (i = 0; i < upper_height - 1; i++) {
-        pipe_buffer[i] = pipe_metatiles[PIPE_BODY_MT][slice_progress];
+  
+    upper_height = pipe_heights[gap_index][0];
+    lower_height = pipe_heights[gap_index][1];
+  
+    if (upper_height >= lower_height) {
+	background_tiles = (upper_height-lower_height)/2;
+        offset = 1;
     }
-    pipe_buffer[upper_height - 1] = pipe_metatiles[PIPE_BRIM_MT][slice_progress];
+  
+    // Variables to handle number of tiles in each pipe height
+    n_pipe_body_sky_upper = upper_height - 1;
+    n_sky = PIPE_GAP_TILES - background_tiles;
+    n_background = background_tiles;
+    n_pipe_body_sky_lower = lower_height - CITY_HEIGHT - 1;
+    n_pipe_body_city = CITY_HEIGHT - 1 - background_tiles - offset;
+  
+  
+    //-------------------------------------------------------------
+  
+    // --- Draw Upper Pipe Body Sky ---
+    for (i = 0; i < n_pipe_body_sky_upper; i++) {
+        pipe_buffer[cont] = pipe_metatiles[PIPE_BODY_SKY][slice_progress];
+        cont++;
+    }
+  
+    // --- Draw Upper Pipe Brim ---
+    pipe_buffer[cont] = pipe_metatiles[PIPE_BRIM][slice_progress];
+    cont++;
+  
+    // --- Draw Sky ---
+    for (i = 0; i < n_sky; i++) {
+        pipe_buffer[cont] = pipe_metatiles[SKY][slice_progress];
+        cont++;
+    }
+  
+    // --- Draw Background ---
+    for (i = 0; i < n_background; i++) {
+        pipe_buffer[cont] = pipe_metatiles[CLOUDS_OUTLINE + i][slice_progress];
+        cont++;
+    }
+  
+    // --- Draw Lower Pipe Brim ---
+    pipe_buffer[cont] = pipe_metatiles[PIPE_BRIM][slice_progress];
+    cont++;
+  
+    // --- Draw Lower Pipe Body Sky ---
+    for (i = 0; i < n_pipe_body_sky_lower; i++) {
+        pipe_buffer[cont] = pipe_metatiles[PIPE_BODY_SKY][slice_progress];
+        cont++;
+    }
+  
+    // --- Draw Lower Pipe Body City ---
+    for (i = 0; i < n_pipe_body_city; i++) {
+        pipe_buffer[cont] = pipe_metatiles[PIPE_BODY_CITY][slice_progress];
+        cont++;
+    }
+  
+    // --- Draw Lower Pipe Body Floor ---
+    pipe_buffer[cont] = pipe_metatiles[PIPE_BODY_FLOOR][slice_progress];
+    cont++;
+  
+   //-------------------------------------------------------------
+  
+    // Clear color buffer first
+    for (i = 0; i < PLAYROWS / 4; i++) {
+        color_buffer[i] = 0x00;
+    }
 
-    // --- Draw Sky (Gap) ---
-    for (i = 0; i < PIPE_GAP_TILES; i++) {
-        pipe_buffer[upper_height + i] = pipe_metatiles[SKY][slice_progress];
+    // For each tile row in the column
+    for (i = 0; i < cont; i++) {
+        // Check if it's a background tile that needs palette 3
+        if (i >= n_pipe_body_sky_upper + 1 + n_sky &&
+            i < n_pipe_body_sky_upper + 1 + n_sky + n_background) {
+
+            byte attr_index = i / 4;
+            byte row_in_attr = i % 4;
+
+            // These are the quadrant bit shifts
+            byte shift_left  = (row_in_attr < 2) ? 0 : 4; // TL or BL
+            byte shift_right = (row_in_attr < 2) ? 2 : 6; // TR or BR
+
+            // Set palette 3 (0b11) for both left and right halves
+            color_buffer[attr_index] &= ~((0b11 << shift_left) | (0b11 << shift_right));
+            color_buffer[attr_index] |=  ((0b11 << shift_left) | (0b11 << shift_right));
+        }
     }
 
-    // --- Draw Lower Pipe ---
-    pipe_buffer[upper_height + PIPE_GAP_TILES] = pipe_metatiles[PIPE_BRIM_MT][slice_progress];
-    for (i = 0; i < lower_height - 1; i++) {
-        pipe_buffer[upper_height + PIPE_GAP_TILES + 1 + i] = pipe_metatiles[PIPE_BODY_MT][slice_progress];
-    }
+
+  //-----------------------------------------------------------------
 
     // Compute VRAM address and write the entire column in ONE call
     addr = base_addr + (STATUS_BAR_HEIGHT_TILES * 32) + tile_x + slice_progress;
@@ -564,14 +670,11 @@ void put_color(word addr) {
 
 // Convert a nametable address to its corresponding attribute table address
 word nametable_to_attribute_addr(word a) {
-    return (a & 0x2C00) // Keep nametable origin
-         | 0x3C0        // Start of attribute table
-         | ((a >> 4) & 0x38) // Row within attribute table
+    return (a & 0x2C00)       // Keep nametable origin
+         | 0x3C0              // Start of attribute table
+         | ((a >> 4) & 0x38)  // Row within attribute table
          | ((a >> 2) & 0x07); // Column within attribute table
 }
-
-
-
 
 
 // Function to check collision with pipes
@@ -605,10 +708,7 @@ bool check_collision() {
                 collision = true;  // Collision detected, player dies
             }
         }
-  
-
     }
-  
   
     return collision;  // No collision
 }
@@ -694,6 +794,7 @@ void flash_screen() {
 // Load the nametable for the menu state
 void setup_menu() { 
   ppu_off(); // Turn off rendering to safely update VRAM
+  setup_audio();
   vram_adr(NAMETABLE_A);
   vram_write(nametable_title, 1024);
   ppu_on_all(); // Turn rendering back on
@@ -822,7 +923,6 @@ void main(void)
 { 
 
   setup_graphics();
-  setup_audio();
   
   setup_menu();
   
