@@ -49,6 +49,9 @@
 //#link "tileset.s"
 
 // Game Nametables
+#include "nametable_ufabc.h"
+#include "nametable_another_universe.h"
+
 #include "nametable_game.h"
 #include "nametable_title.h"
 #include "nametable_death.h"
@@ -129,9 +132,11 @@ extern char sfx_game[];
 
 
 // Game State Definitions
-#define STATE_MENU  0
-#define STATE_GAME  1
-#define STATE_DEATH 2
+#define STATE_CREDITS 0
+#define STATE_MENU  1
+#define STATE_GAME  2
+#define STATE_DEATH 3
+
 
 
 
@@ -237,7 +242,7 @@ unsigned int score = 0;
 
 
 // Game state variable
-unsigned char game_state = STATE_MENU; // Start with menu
+unsigned char game_state = STATE_CREDITS; // Start with menu
 
 // Timer variable (stores frames left)
 unsigned int timer_frames = 0;
@@ -256,10 +261,12 @@ void setup_audio();
 void setup_menu();
 void setup_game();
 void setup_death();
+void setup_credits();
 
 void update_menu();
 void update_game();
 void update_death();
+
 void check_game_state();
 
 
@@ -393,7 +400,6 @@ void initialize_player() {
 // Updates all aspects of the player’s movement each frame.
  
 void update_player() {
-  handle_player_input();     // Reads and Process controller input
   apply_player_physics();    // Apply gravity and movement physics
   handle_player_movement();  // Updates player movement using subpixel calculations
 }
@@ -458,9 +464,6 @@ void handle_player_movement() {
   
   player_y = new_y;  // Update player position
 }
-
-
-
 
 
 
@@ -677,6 +680,9 @@ word nametable_to_attribute_addr(word a) {
 }
 
 
+
+
+
 // Function to check collision with pipes
 bool check_collision() {
     byte i;
@@ -722,8 +728,8 @@ void update_score_display() {
     score_str[1] = '0' + ((score / 10) % 10);    // Tens place
     score_str[0] = '0' + ((score / 100) % 10);   // Hundreds place
 
-    // Queue the score update in the VRAM buffer (tiles 7,1 - 9,1)
-    vrambuf_put(NTADR_A(7,1), score_str, 3);
+    // Queue the score update in the VRAM buffer (tiles 8,1 - 10,1)
+    vrambuf_put(NTADR_A(8,1), score_str, 3);
 }
 
 
@@ -821,9 +827,31 @@ void setup_death() {
 
 }
 
+void setup_credits() {
+  ppu_off(); // Turn off rendering to safely update VRAM
+  pal_bright(0);
+  vram_adr(NAMETABLE_A);
+  vram_write(nametable_ufabc, 1024);
+  ppu_on_all(); // Turn rendering back on
+  fade_in();
+  delay(80);
+  
+  fade_out();
+  ppu_off();
+  vram_adr(NAMETABLE_A);
+  vram_write(nametable_another_universe, 1024);
+  ppu_on_all();
+  fade_in();
+  delay(80);
+  fade_out();
+  
+  setup_menu();
+  game_state = STATE_MENU;
+  fade_in();
+}
+
 
 //------------------------------- Update States ------------------------------------//
-
 
 
 // Handle the menu state
@@ -857,12 +885,14 @@ void update_game() {
     
     ppu_wait_nmi();   // wait for NMI to ensure previous frame finished
     vrambuf_clear();  // Clear VRAM buffer each frame immediately after NMI
+  
+    handle_player_input();     // Reads and Process controller input
     
     // Sets the scroll register using `split()`.
     split(scroll_x, 0);  // Update the scroll position
-        
+  
     oam_id = oam_meta_spr(PLAYER_X, player_y, oam_id, bird); // draw flappy bird metasprite
-    
+ 
     update_player();
   
     if (player_alive) scroll_horizontal();
@@ -876,9 +906,7 @@ void update_game() {
       sfx_play(4, 1);    
       scroll_x_sub = 0;     // x scroll position (subpixel)
       scroll_x_vel = 0;    // x scroll velocity in subpixels
-    }
-  
-    
+    } 
     
 }
 
@@ -924,7 +952,7 @@ void main(void)
 
   setup_graphics();
   
-  setup_menu();
+  setup_credits();
   
   // infinite main loop
   while(1) {
