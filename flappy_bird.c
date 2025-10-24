@@ -2,6 +2,7 @@
 //               Flappy Bird for the NES                  //
 //--------------------------------------------------------//
 // ~ by vitimbro and catsyser
+// ~ another universe
 
 /*
 
@@ -424,9 +425,7 @@ void apply_player_physics() {
   player_y_vel += GRAVITY;  // Apply gravity (Increases downward velocity each frame.)
   
   // Caps fall speed to `MAX_GRAVITY` to prevent excessive falling speed.
-  if (player_y_vel > MAX_GRAVITY) {
-    player_y_vel = MAX_GRAVITY;
-  }
+  if (player_y_vel > MAX_GRAVITY) player_y_vel = MAX_GRAVITY;
 }
 
 
